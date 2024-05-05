@@ -27,10 +27,10 @@ pw_CheckStatus() {
 	    pw_ACStatus="$(apm -a)";;
 
     *)
-      pw_BatteryLevel="$(apm -l)"
-      pw_BatteryStatus="$(apm -b)"
-      pw_ACStatus="$(apm -a)"
-  esac
+		pw_BatteryLevel="$(apm -l)"
+    	pw_BatteryStatus="$(apm -b)"
+    	pw_ACStatus="$(apm -a)"
+	esac
 }
 
 pw_ChangeIcon() {
@@ -90,18 +90,18 @@ pw_DischargeNotif() {
 		pw_Sound
 		pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
 	else
-    local pw_Counter=0
+		local pw_Counter=0
 		while true; do
-      pw_CheckStatus BatteryStatus
-      pw_CheckStatus ACStatus
+			pw_CheckStatus BatteryStatus
+			pw_CheckStatus ACStatus
 			if [ "$pw_Counter" -eq 10 ]; then
-        return 1
-      elif [ "$pw_BatteryStatus" != 3 -a "$pw_ACStatus" -eq 0 ]; then
+				return 1
+			elif [ "$pw_BatteryStatus" != 3 -a "$pw_ACStatus" -eq 0 ]; then
 				break
-      fi
+			fi
 
 			sleep 0.5s
-      local pw_Counter=$(($pw_Counter + 1))
+			local pw_Counter=$(($pw_Counter + 1))
 		done
 	  
     pw_CheckStatus BatteryLevel
@@ -110,9 +110,9 @@ pw_DischargeNotif() {
 			0)
 				pw_SummonNotif "Discharging - $pw_BatteryLevel%" "" "normal" &;;
 			1)
-	      w_SummonNotif "Low Battery - $pw_BatteryLevel%" "Charge your laptop." "normal" &;;
+				w_SummonNotif "Low Battery - $pw_BatteryLevel%" "Charge your laptop." "normal" &;;
 			2)
-        pw_SummonNotif "Critical Low Battery - $pw_BatteryLevel%" "Charge your laptop or it will shut down soon." "critical" &;;
+				pw_SummonNotif "Critical Low Battery - $pw_BatteryLevel%" "Charge your laptop or it will shut down soon." "critical" &;;
 		esac
 	
 	fi
@@ -121,8 +121,8 @@ pw_DischargeNotif() {
 }
 
 pw_QuitDaemon() {
-  rm /tmp/pw_BatteryDaemon
-  exit 0
+	rm /tmp/pw_BatteryDaemon
+	exit 0
 }
 
 #if [ $pw_BatteryStatus -eq 3 ]; then
@@ -148,42 +148,47 @@ pw_MainModule() {
 
 	pw_CheckStatus
 	
-  if [ "$pw_BatteryLevel" -eq 100 ] \
-  && [ "$pw_ACStatus" -eq 1 ] \
-  && [ "$pw_Charging" -eq "False" ]; then
-    pw_ChangeIcon
-    pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal"
-    pw_Charging="True";
-  elif [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
-    if pw_DischargeNotif; then
-      pw_Charging="False"
-    fi
-  elif [ "$pw_ACStatus" = 1 -a "$pw_Charging" = "False" ]; then
-    pw_DischargeNotif
-    pw_Charging="True"
-    pw_LowBattery="False"
-    pw_CriticalBattery="False"
-  fi
+	if [ "$pw_BatteryLevel" -eq 100 ] \
+	&& [ "$pw_ACStatus" -eq 1 ] \
+	&& [ "$pw_Charging" -eq "False" ]; then
+		pw_ChangeIcon
+    	pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal"
+    	pw_Charging="True";
+	elif [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
+    	if pw_DischargeNotif; then
+    		pw_Charging="False"
+		fi
+	elif [ "$pw_ACStatus" = 1 -a "$pw_Charging" = "False" ]; then
+    	pw_DischargeNotif
+    	pw_Charging="True"
+    	pw_LowBattery="False"
+    	pw_CriticalBattery="False"
+	fi
 
 	sleep 0.1s
 
-  if [ "$pw_BatteryStatus" != "$pw_CurrentBatteryStatus" ] && [ "$pw_Charging" = "False" ]; then
-	  pw_DischargeNotif
-    pw_CurrentBatteryPercentage="$pw_BatteryLevel"
-    pw_CurrentBatteryStatus="$pw_BatteryStatus"
-    pw_CurrentACStatus="$pw_ACStatus"
-  fi
+	if [ "$pw_BatteryStatus" != "$pw_CurrentBatteryStatus" ] && [ "$pw_Charging" = "False" ]; then
+		pw_DischargeNotif
+    	pw_CurrentBatteryPercentage="$pw_BatteryLevel"
+    	pw_CurrentBatteryStatus="$pw_BatteryStatus"
+    	pw_CurrentACStatus="$pw_ACStatus"
+	fi
 }
 
 case $1 in
 	"daemon")
-    touch /tmp/pw_BatteryDaemon
-    trap pw_QuitDaemon SIGINT
-    while true; do
-	    pw_MainModule	
-	    sleep 0.5s
-    done;;
-  *)
-    pw_ChangeIcon
-    pw_DischargeNotif;;
+		if [ -e /tmp/pw_BatteryDaemon ]; then
+			echo "You already have a battery daemon running."
+    	else
+			touch /tmp/pw_BatteryDaemon
+		fi
+
+    	trap pw_QuitDaemon SIGINT
+    	while true; do
+	    	pw_MainModule	
+	    	sleep 0.5s
+    	done;;
+	*)
+    	pw_ChangeIcon
+    	pw_DischargeNotif;;
 esac
