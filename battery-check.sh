@@ -90,6 +90,7 @@ pw_DischargeNotif() {
 			pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
 		else
 			echo "[Charging] $pw_BatteryLevel%"
+		fi
 	else
 		local pw_Counter=0
 		while true; do
