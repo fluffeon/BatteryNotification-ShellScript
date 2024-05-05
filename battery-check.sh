@@ -91,7 +91,8 @@ elif [ "$pw_CurrentBatteryStatus" != 3 ] || [ "$pw_ACStatus" != 1]; then
 	pw_Charging="False"
 fi
 
-
+case $1 in
+	"daemon")
 while true; do
 
 	if     [ "$pw_BatteryLevel" -eq 100 ] \
@@ -132,4 +133,19 @@ while true; do
 	
 	pw_CheckStatus
 	sleep 0.5s
-done
+done;;
+*)
+if     [ "$pw_BatteryLevel" -eq 100 ] \
+                && [ "$pw_ACStatus" -eq 1 ] \
+                && [ "$pw_Charging" -eq "True" ]; then
+                        pw_ChangeIcon
+                        pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal" &
+                        pw_Charging="True";
+        elif [ "$pw_Charging" = "False" ]; then
+                pw_ChangeIcon
+                pw_SummonNotif "Discharging - $pw_BatteryLevel%" "" "normal" &
+        elif [ "$pw_Charging" = "True" ]; then
+                pw_ChangeIcon
+                pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal" &
+        fi;;
+esac
