@@ -77,7 +77,7 @@ pw_Sound() {
 		"oss")
 			cat Charging.raw > /dev/dsp &;;
 		"pulse")
-			paplay Charging.wav &;;
+			paplay "/home/fen/My working dirs/BatteryScript/Charging.wav" > /dev/null &;;
 	esac
 }
 
@@ -86,7 +86,10 @@ pw_DischargeNotif() {
 	
 	if [ $pw_ACStatus = 1 ]; then
 		pw_Sound
-		pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
+		if [ -n "$DISPLAY" ]; then
+			pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
+		else
+			echo "[Charging] $pw_BatteryLevel%"
 	else
 		local pw_Counter=0
 		while true; do
@@ -101,19 +104,29 @@ pw_DischargeNotif() {
 			sleep 0.5s
 			local pw_Counter=$(($pw_Counter + 1))
 		done
+	fi
 	  
     pw_CheckStatus BatteryLevel
-
+    
+    if [ -n "$DISPLAY" ]; then
 		case $pw_BatteryStatus in
 			0)
 				pw_SummonNotif "Discharging - $pw_BatteryLevel%" "" "normal" &;;
 			1)
-				w_SummonNotif "Low Battery - $pw_BatteryLevel%" "Charge your laptop." "normal" &;;
+				pw_SummonNotif "Low Battery - $pw_BatteryLevel%" "Charge your laptop." "normal" &;;
 			2)
 				pw_SummonNotif "Critical Low Battery - $pw_BatteryLevel%" "Charge your laptop or it will shut down soon." "critical" &;;
 		esac
-	
-	fi
+    else
+		case $pw_BatteryStatus in
+        	0)
+        		echo "[Discharging] $pw_BatteryLevel%";;
+    		1)
+        		echo "[Low Battery] $pw_BatteryLevel% - Charge your laptop.";;
+    		2)
+        		echo "[Critical Low Battery] - $pw_BatteryLevel% - Charge your laptop or it will shut down soon.";;
+		esac
+    fi
 
   return
 }
@@ -150,8 +163,12 @@ pw_MainModule() {
 	&& [ "$pw_ACStatus" -eq 1 ] \
 	&& [ "$pw_Charging" -eq "False" ]; then
 		pw_ChangeIcon
-    	pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal"
-    	pw_Charging="True";
+    	if [ -n "$DISPLAY" ]; then
+    		pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal"
+    	else
+    		echo "[Charged] $pw_BatteryLevel% - You can disconnect your charger now."
+    		pw_Charging="True"
+		fi;
 	elif [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
     	if pw_DischargeNotif; then
     		pw_Charging="False"
