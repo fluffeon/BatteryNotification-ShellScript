@@ -178,7 +178,8 @@ pw_MainModule() {
 case $1 in
 	"daemon")
 		if [ -e /tmp/pw_BatteryDaemon ]; then
-			echo "You already have a battery daemon running."
+			echo "You already have a battery daemon running."-e
+			exit 1
     	else
 			touch /tmp/pw_BatteryDaemon
 		fi
