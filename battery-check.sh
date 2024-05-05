@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x
-
 pw_IconDir="/usr/local/share/icons/Adwaita"
 pw_ExtraDir="/scalable/status"
 pw_SoundSystem="pulse"
