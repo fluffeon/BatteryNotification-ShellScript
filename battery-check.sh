@@ -5,30 +5,48 @@ pw_ExtraDir="/scalable/status"
 pw_SoundSystem="pulse"
 
 pw_CheckStatus() {
-  case $1 in
-    "BatteryLevel")
-	    pw_BatteryLevel="$(apm -l)";;
-    
-    "BatteryStatus")
-	    # Battery Status
-	    # 0 = High
-	    # 1 = Low
-	    # 2 = Critical
-	    # 3 = Charging
-	    pw_BatteryStatus="$(apm -b)";;
-      
-    "ACStatus")
-	    # AC Status
-	    # 0 - Off-Line
-	    # 1 - On-Line
-	    # 2 - Backup Power
-	    pw_ACStatus="$(apm -a)";;
+case $pw_DebugMode in
+"True")
 
-    *)
+	case $1 in
+	"BatteryLevel")
+		pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)";;
+	"BatteryStatus")
+		pw_BatteryStatus="$(cat /tmp/pw_BatteryStatusDebug)";;
+	"ACStatus")
+		pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)";;
+	*)
+		pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)"
+		pw_BatteryStatus="$(cat /tmp/pw_BatteryStatusDebug)"
+		pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)";;
+	esac;;
+
+*)
+	case $1 in
+	"BatteryLevel")
+		pw_BatteryLevel="$(apm -l)";;
+  
+	"BatteryStatus")
+		# Battery Status
+		# 0 = High
+		# 1 = Low
+		# 2 = Critical
+		# 3 = Charging
+		pw_BatteryStatus="$(apm -b)";;
+      
+	"ACStatus")
+		# AC Status
+		# 0 - Off-Line
+		# 1 - On-Line
+		# 2 - Backup Power
+		pw_ACStatus="$(apm -a)";;
+
+	*)
 		pw_BatteryLevel="$(apm -l)"
-    	pw_BatteryStatus="$(apm -b)"
-    	pw_ACStatus="$(apm -a)"
+    		pw_BatteryStatus="$(apm -b)"
+    		pw_ACStatus="$(apm -a)"
 	esac
+esac
 }
 
 pw_ChangeIcon() {
@@ -77,7 +95,7 @@ pw_Sound() {
 		"oss")
 			cat Charging.raw > /dev/dsp &;;
 		"pulse")
-			paplay "/home/fen/My working dirs/BatteryScript/Charging.wav" > /dev/null &;;
+			paplay "/home/fen/My working dirs/BatteryScript/Charging.wav" >> /dev/null &;;
 	esac
 }
 
@@ -86,7 +104,7 @@ pw_DischargeNotif() {
 	
 	if [ $pw_ACStatus = 1 ]; then
 		pw_Sound
-		if [ -n "$DISPLAY" ]; then
+    if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
 			pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
 		else
 			echo "[Charging] $pw_BatteryLevel%"
@@ -105,11 +123,11 @@ pw_DischargeNotif() {
 			sleep 0.5s
 			local pw_Counter=$(($pw_Counter + 1))
 		done
-	fi
+	
 	  
     pw_CheckStatus BatteryLevel
     
-    if [ -n "$DISPLAY" ]; then
+    if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
 		case $pw_BatteryStatus in
 			0)
 				pw_SummonNotif "Discharging - $pw_BatteryLevel%" "" "normal" &;;
@@ -118,7 +136,7 @@ pw_DischargeNotif() {
 			2)
 				pw_SummonNotif "Critical Low Battery - $pw_BatteryLevel%" "Charge your laptop or it will shut down soon." "critical" &;;
 		esac
-    else
+  else 
 		case $pw_BatteryStatus in
         	0)
         		echo "[Discharging] $pw_BatteryLevel%";;
@@ -129,11 +147,20 @@ pw_DischargeNotif() {
 		esac
     fi
 
+    fi
+
   return
 }
 
 pw_QuitDaemon() {
 	rm /tmp/pw_BatteryDaemon
+
+#	if [ "$pw_DebugMode" = "True" ]; then
+#		rm /tmp/pw_BatteryLevelDebug
+#		rm /tmp/pw_BatteryStatusDebug
+#		rm /tmp/pw_ACStatusDebug
+#	fi
+
 	exit 0
 }
 
@@ -159,17 +186,24 @@ fi
 pw_MainModule() {
 
 	pw_CheckStatus
-	
+  if [ "$pw_DebugMode" != "True" ]; then
+  if [ "$CLIBehaviorLockin" = "True" ] || [ -z $DISPLAY ]; then
+    echo "CLI" > /tmp/pw_BatteryDaemon
+  elif [ "$CLIBehaviorLockin" = "False" ] && [ ! -z $DISPLAY ]; then
+    echo "X11" > /tmp/pw_BatteryDaemon
+  fi
+  fi
+
 	if [ "$pw_BatteryLevel" -eq 100 ] \
 	&& [ "$pw_ACStatus" -eq 1 ] \
 	&& [ "$pw_Charging" -eq "False" ]; then
 		pw_ChangeIcon
-    	if [ -n "$DISPLAY" ]; then
+    if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
     		pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal"
-    	else
+      else
     		echo "[Charged] $pw_BatteryLevel% - You can disconnect your charger now."
-    		pw_Charging="True"
-		fi;
+    	fi
+      pw_Charging="True";
 	elif [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
     	if pw_DischargeNotif; then
     		pw_Charging="False"
@@ -189,23 +223,67 @@ pw_MainModule() {
     	pw_CurrentBatteryStatus="$pw_BatteryStatus"
     	pw_CurrentACStatus="$pw_ACStatus"
 	fi
+
 }
 
 case $1 in
+  "help")
+    echo "./battery-check.sh [arg1] [arg2]]"
+    echo "help - Shows the help information"
+    echo "daemon [subargs: cli] - Runs this script as a cron job/daemon"
+    exit 0;;
 	"daemon")
 		if [ -e /tmp/pw_BatteryDaemon ]; then
 			echo "You already have a battery daemon running."
 			exit 1
-    	else
-			touch /tmp/pw_BatteryDaemon
 		fi
+	
+  if [ "$2" = "cli" ]; then
+    pw_CLIBehaviorLockin="True"
+    pw_DebugMode="False"
+  elif [ "$2" = "debug" ]; then
+	echo "Debug mode activated."
+	echo 95 > /tmp/pw_BatteryLevelDebug
+	echo 0 > /tmp/pw_BatteryStatusDebug
+	echo 0 > /tmp/pw_ACStatusDebug
+	pw_DebugMode="True"
+    pw_CLIBehaviorLockin="False"
+else
+pw_DebugMode="False"
+pw_CLIBehaviorLockin="False"
+  fi
+
+	if [ "$pw_CLIBehaviorLockin" = "False" ] && [ ! -z $DISPLAY ]; then
+		echo "X11" > /tmp/pw_BatteryDaemon
+  elif [ $pw_CLIBehaviorLockin = "True" ] || [ -z $DISPLAY ]; then
+		echo "CLI" > /tmp/pw_BatteryDaemon
+	fi
 
     	trap pw_QuitDaemon SIGINT
+		trap pw_QuitDaemon SIGTERM
+		trap pw_QuitDaemon SIGKILL
+		trap pw_QuitDaemon SIGABRT
+		trap pw_QuitDaemon SIGQUIT
+		trap pw_QuitDaemon SIGHUP
     	while true; do
 	    	pw_MainModule	
 	    	sleep 0.5s
     	done;;
+
 	*)
-    	pw_ChangeIcon
-    	pw_DischargeNotif;;
+	
+	if [ ! -e /tmp/pw_BatteryDaemon ]; then
+		if [ "$1" != "cli" ] && [ ! -z $DISPLAY ]; then
+			echo "X11" > /tmp/pw_BatteryDaemon
+			pw_ChangeIcon
+		else
+			echo "CLI" > /tmp/pw_BatteryDaemon
+		fi
+
+    		pw_DischargeNotif
+		rm /tmp/pw_BatteryDaemon
+	else
+		pw_DischargeNotif
+	fi
+	;;
 esac
