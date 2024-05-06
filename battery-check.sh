@@ -15,13 +15,30 @@ case $pw_DebugMode in
 	"BatteryLevel")
 		pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)";;
 	"BatteryStatus")
-		pw_BatteryStatus="$(cat /tmp/pw_BatteryStatusDebug)";;
+		if [ "$pw_ACStatus" -eq 1 ]; then
+			pw_BatteryStatus=3
+		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=0
+		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=2
+		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=1
+		fi;;
 	"ACStatus")
 		pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)";;
 	*)
 		pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)"
-		pw_BatteryStatus="$(cat /tmp/pw_BatteryStatusDebug)"
-		pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)";;
+    	pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)"
+
+		if [ "$pw_ACStatus" -eq 1 ]; then
+			pw_BatteryStatus=3
+		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=0
+		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ]; then
+			pw_BatteryStatus=2
+		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=1
+		fi;;
 	esac;;
 
 *)
@@ -37,11 +54,11 @@ case $pw_DebugMode in
 		# 3 = Charging
 		if [ "$pw_ACStatus" -eq 1 ]; then
 			pw_BatteryStatus=3
-		elif [ "$pw_BatteryLevel" -gt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
 			pw_BatteryStatus=0
-		elif [ "$pw_BatteryLevel" -lt $pw_CriticalLowBatteryPercentage ]; then
+		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
 			pw_BatteryStatus=2
-		elif [ "$pw_BatteryLevel" -lt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
 			pw_BatteryStatus=1
 		fi;;
       
@@ -58,11 +75,11 @@ case $pw_DebugMode in
 
 		if [ "$pw_ACStatus" -eq 1 ]; then
 			pw_BatteryStatus=3
-		elif [ "$pw_BatteryLevel" -gt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
 			pw_BatteryStatus=0
-		elif [ "$pw_BatteryLevel" -lt $pw_CriticalLowBatteryPercentage ]; then
+		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ]; then
 			pw_BatteryStatus=2
-		elif [ "$pw_BatteryLevel" -lt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
 			pw_BatteryStatus=1
 		fi
 
@@ -134,17 +151,17 @@ pw_DischargeNotif() {
 			if [ "$pw_BatteryLevel" = 100 ]; then
 				pw_SummonNotif "[Charged] $pw_BatteryLevel%"
 			else
-				echo "[Charged] $pw_BatteryLevel%"
+				echo "[Charging] $pw_BatteryLevel%"
 			fi
 		fi
 	else
 		local pw_Counter=0
 		while true; do
-			pw_CheckStatus BatteryStatus
 			pw_CheckStatus ACStatus
+			pw_CheckStatus BatteryStatus
 			if [ "$pw_Counter" -eq 10 ]; then
 				return 1
-			elif [ "$pw_BatteryStatus" != 3 -a "$pw_ACStatus" -eq 0 ]; then
+			elif [ "$pw_BatteryStatus" != 3 ] && [ "$pw_ACStatus" -eq 0 ]; then
 				break
 			fi
 
@@ -202,8 +219,6 @@ pw_QuitDaemon() {
 pw_CheckStatus
 
 pw_CurrentBatteryStatus="$pw_BatteryStatus"
-pw_CurrentBatteryPercentage="$pw_BatteryLevel"
-pw_CurrentACStatus="$pw_ACStatus"
 
 if [ "$pw_CurrentBatteryStatus" = 3 ] || [ "$pw_ACStatus" = 1 ]; then
 	pw_Charging="True"
@@ -228,18 +243,16 @@ pw_MainModule() {
   fi
   fi
 
-	if [ "$pw_ACStatus" = 0 ] && [ "$pw_Charging" = "True" ]; then
+	if [ "$pw_ACStatus" -eq 0 ] && [ "$pw_Charging" = "True" ]; then
 		pw_ChangeIcon
     	if pw_DischargeNotif; then
     		pw_Charging="False"
 		fi
-	elif [ "$pw_ACStatus" = 1 ] && [ "$pw_Charging" = "False" ]; then
+	elif [ "$pw_ACStatus" -eq 1 ] && [ "$pw_Charging" = "False" ]; then
 		pw_ChangeIcon
 		pw_Sound
     	pw_DischargeNotif
     	pw_Charging="True"
-    	pw_LowBattery="False"
-    	pw_CriticalBattery="False"
 	fi
 
 	sleep 0.1s
@@ -254,9 +267,7 @@ pw_MainModule() {
 
 	if [ "$pw_BatteryStatus" != "$pw_CurrentBatteryStatus" ] && [ "$pw_Charging" = "False" ]; then
 		pw_DischargeNotif
-    	pw_CurrentBatteryPercentage="$pw_BatteryLevel"
     	pw_CurrentBatteryStatus="$pw_BatteryStatus"
-    	pw_CurrentACStatus="$pw_ACStatus"
 	fi
 
 }
@@ -279,7 +290,6 @@ case $1 in
   elif [ "$2" = "debug" ]; then
 	echo "Debug mode activated."
 	echo 95 > /tmp/pw_BatteryLevelDebug
-	echo 0 > /tmp/pw_BatteryStatusDebug
 	echo 0 > /tmp/pw_ACStatusDebug
 	pw_DebugMode="True"
     pw_CLIBehaviorLockin="False"
