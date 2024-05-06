@@ -4,6 +4,9 @@ pw_IconDir="/usr/local/share/icons/Adwaita"
 pw_ExtraDir="/scalable/status"
 pw_SoundSystem="pulse"
 
+pw_LowBatteryPercentage=20
+pw_CriticalLowBatteryPercentage=10
+
 pw_CheckStatus() {
 case $pw_DebugMode in
 "True")
@@ -32,7 +35,15 @@ case $pw_DebugMode in
 		# 1 = Low
 		# 2 = Critical
 		# 3 = Charging
-		pw_BatteryStatus="$(apm -b)";;
+		if [ "$pw_ACStatus" -eq 1 ]; then
+			pw_BatteryStatus=3
+		elif [ "$pw_BatteryLevel" -gt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=0
+		elif [ "$pw_BatteryLevel" -lt $pw_CriticalLowBatteryPercentage ]; then
+			pw_BatteryStatus=2
+		elif [ "$pw_BatteryLevel" -lt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=1
+		fi;;
       
 	"ACStatus")
 		# AC Status
@@ -43,8 +54,18 @@ case $pw_DebugMode in
 
 	*)
 		pw_BatteryLevel="$(apm -l)"
-    		pw_BatteryStatus="$(apm -b)"
-    		pw_ACStatus="$(apm -a)"
+    	pw_ACStatus="$(apm -a)"
+
+		if [ "$pw_ACStatus" -eq 1 ]; then
+			pw_BatteryStatus=3
+		elif [ "$pw_BatteryLevel" -gt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=0
+		elif [ "$pw_BatteryLevel" -lt $pw_CriticalLowBatteryPercentage ]; then
+			pw_BatteryStatus=2
+		elif [ "$pw_BatteryLevel" -lt $pw_LowBatteryPercentage ] && [ "$pw_ACStatus" != 1 ]; then
+			pw_BatteryStatus=1
+		fi
+
 	esac
 esac
 }
@@ -102,7 +123,7 @@ pw_Sound() {
 pw_DischargeNotif() {
 	pw_ChangeIcon
 	
-	if [ $pw_ACStatus = 1 ]; then
+	if [ "$pw_ACStatus" = 1 ]; then
     if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
 			if [ "$pw_BatteryLevel" = 100 ]; then
 				pw_SummonNotif "Charged - $pw_BatteryLevel%" "" "normal"
@@ -137,7 +158,7 @@ pw_DischargeNotif() {
     if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
 		case $pw_BatteryStatus in
 			0)
-				pw_SummonNotif "Discharging - $pw_BatteryLevel%" "" "normal" &;;
+				pw_SummonNotif "Discharging - $pw_BatteryLevel%" "" "low" &;;
 			1)
 				pw_SummonNotif "Low Battery - $pw_BatteryLevel%" "Charge your laptop." "normal" &;;
 			2)
@@ -200,19 +221,19 @@ pw_MainModule() {
 
 	pw_CheckStatus
   if [ "$pw_DebugMode" != "True" ]; then
-  if [ "$CLIBehaviorLockin" = "True" ] || [ -z $DISPLAY ]; then
+  if [ "$CLIBehaviorLockin" = "True" ] || [ -z "$DISPLAY" ]; then
     echo "CLI" > /tmp/pw_BatteryDaemon
-  elif [ "$CLIBehaviorLockin" = "False" ] && [ ! -z $DISPLAY ]; then
+  elif [ "$CLIBehaviorLockin" = "False" ] && [ -n "$DISPLAY" ]; then
     echo "X11" > /tmp/pw_BatteryDaemon
   fi
   fi
 
-	if [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
+	if [ "$pw_ACStatus" = 0 ] && [ "$pw_Charging" = "True" ]; then
 		pw_ChangeIcon
     	if pw_DischargeNotif; then
     		pw_Charging="False"
 		fi
-	elif [ "$pw_ACStatus" = 1 -a "$pw_Charging" = "False" ]; then
+	elif [ "$pw_ACStatus" = 1 ] && [ "$pw_Charging" = "False" ]; then
 		pw_ChangeIcon
 		pw_Sound
     	pw_DischargeNotif
@@ -273,12 +294,11 @@ pw_CLIBehaviorLockin="False"
 		echo "CLI" > /tmp/pw_BatteryDaemon
 	fi
 
-    	trap pw_QuitDaemon SIGINT
-		trap pw_QuitDaemon SIGTERM
-		trap pw_QuitDaemon SIGKILL
-		trap pw_QuitDaemon SIGABRT
-		trap pw_QuitDaemon SIGQUIT
-		trap pw_QuitDaemon SIGHUP
+    	trap pw_QuitDaemon INT
+		trap pw_QuitDaemon TERM
+		trap pw_QuitDaemon ABRT
+		trap pw_QuitDaemon QUIT
+		trap pw_QuitDaemon HUP
     	while true; do
 	    	pw_MainModule	
 	    	sleep 0.5s
