@@ -103,11 +103,18 @@ pw_DischargeNotif() {
 	pw_ChangeIcon
 	
 	if [ $pw_ACStatus = 1 ]; then
-		pw_Sound
     if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
-			pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
+			if [ "$pw_BatteryLevel" = 100 ]; then
+				pw_SummonNotif "Charged - $pw_BatteryLevel%" "" "normal"
+			else
+				pw_SummonNotif "Charging - $pw_BatteryLevel%" "" "normal"
+			fi
 		else
-			echo "[Charging] $pw_BatteryLevel%"
+			if [ "$pw_BatteryLevel" = 100 ]; then
+				pw_SummonNotif "[Charged] $pw_BatteryLevel%"
+			else
+				echo "[Charged] $pw_BatteryLevel%"
+			fi
 		fi
 	else
 		local pw_Counter=0
@@ -179,8 +186,14 @@ pw_CurrentACStatus="$pw_ACStatus"
 
 if [ "$pw_CurrentBatteryStatus" = 3 ] || [ "$pw_ACStatus" = 1 ]; then
 	pw_Charging="True"
-elif [ "$pw_CurrentBatteryStatus" != 3 ] || [ "$pw_ACStatus" != 1]; then
+elif [ "$pw_CurrentBatteryStatus" != 3 ] || [ "$pw_ACStatus" != 1 ]; then
 	pw_Charging="False"
+fi
+
+if [ "$pw_BatteryLevel" = 100 ]; then
+	pw_BatteryFull="True"
+else
+	pw_BatteryFull="False"
 fi
 
 pw_MainModule() {
@@ -194,21 +207,14 @@ pw_MainModule() {
   fi
   fi
 
-	if [ "$pw_BatteryLevel" -eq 100 ] \
-	&& [ "$pw_ACStatus" -eq 1 ] \
-	&& [ "$pw_Charging" -eq "False" ]; then
+	if [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
 		pw_ChangeIcon
-    if [ "$(cat /tmp/pw_BatteryDaemon)" = "X11" ]; then
-    		pw_SummonNotif "Charged - $pw_BatteryLevel%" "You can disconnect your charger now." "normal"
-      else
-    		echo "[Charged] $pw_BatteryLevel% - You can disconnect your charger now."
-    	fi
-      pw_Charging="True";
-	elif [ "$pw_ACStatus" = 0 -a "$pw_Charging" = "True" ]; then
     	if pw_DischargeNotif; then
     		pw_Charging="False"
 		fi
 	elif [ "$pw_ACStatus" = 1 -a "$pw_Charging" = "False" ]; then
+		pw_ChangeIcon
+		pw_Sound
     	pw_DischargeNotif
     	pw_Charging="True"
     	pw_LowBattery="False"
@@ -216,6 +222,14 @@ pw_MainModule() {
 	fi
 
 	sleep 0.1s
+
+	if [ "$pw_BatteryLevel" -eq 100 ] && [ "$pw_BatteryFull" = "False" ]; then
+		pw_ChangeIcon
+		pw_DischargeNotif
+		pw_BatteryFull="True"
+	elif [ "$pw_BatteryLevel" != 100 ]; then
+		pw_BatteryFull="False"
+	fi
 
 	if [ "$pw_BatteryStatus" != "$pw_CurrentBatteryStatus" ] && [ "$pw_Charging" = "False" ]; then
 		pw_DischargeNotif
