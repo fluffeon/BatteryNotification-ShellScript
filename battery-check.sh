@@ -128,7 +128,7 @@ pw_SummonNotif() {
 
 }
 
-pw_ForbiddenPrograms="echo rm touch cp mv mkdir printf rmdir"
+pw_ForbiddenPrograms="echo rm touch cp mv mkdir printf rmdir sudo doas su"
 
 pw_OneWordCheck() {
 	
@@ -178,9 +178,13 @@ pw_OneWordCheck() {
 if [ $pw_SoundEnabled = "True" ]; then
 	pw_OneWordCheck
 else
+	pw_CustomMusicProgram=""
 	unset pw_CustomMusicProgram
+	pw_SoundLocation=""
 	unset pw_SoundLocation
+	pw_ArgumentsBeforeFile=""
 	unset pw_ArgumentsBeforeFile
+	pw_ArgumentsAfterFile=""
 	unset pw_ArgumentsAfterFile
 fi
 
