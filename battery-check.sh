@@ -275,10 +275,10 @@ pw_MainModule() {
 
 	pw_CheckStatus
 
-	if [ "$pw_DebugMode" != "True" ]; then
-		if [ "$CLIBehaviorLockin" = "True" ] || [ -z "$DISPLAY" ]; then
+	if [ "$pw_CLIBehaviorLockin" != "True" ] ; then
+		if [ "$pw_DebugMode" != "True" ] && [ -z "$DISPLAY" ]; then
     		echo "CLI" > /tmp/pw_BatteryDaemon
-		elif [ "$CLIBehaviorLockin" = "False" ] && [ -n "$DISPLAY" ]; then
+		elif [ "$pw_DebugMode" != "True" ] && [ -n "$DISPLAY" ]; then
     		echo "X11" > /tmp/pw_BatteryDaemon
   		fi
 	fi
