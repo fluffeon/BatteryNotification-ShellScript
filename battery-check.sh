@@ -2,46 +2,53 @@
 
 pw_IconDir="/usr/local/share/icons/Adwaita"
 pw_ExtraDir="/scalable/status"
-pw_SoundSystem="pulse"
+
+# The name of the program, needs to be reachable in $PATH
+pw_CustomMusicProgram="paplay" # Required if using 'custom'
+pw_SoundLocation="/home/fen/My working dirs/BatteryScript/Charging.wav"
+
+# Your program needs arguments? Parse them below.
+pw_ArgumentsBeforeFile=""
+pw_ArgumentsAfterFile=""
 
 pw_LowBatteryPercentage=20
 pw_CriticalLowBatteryPercentage=10
 
 pw_CheckStatus() {
-case $pw_DebugMode in
-"True")
+	case $pw_DebugMode in
+	"True")
 
-	case $1 in
-	"BatteryLevel")
-		pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)";;
-	"BatteryStatus")
-		if [ "$pw_ACStatus" -eq 1 ]; then
-			pw_BatteryStatus=3
-		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=0
-		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=2
-		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=1
-		fi;;
-	"ACStatus")
-		pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)";;
+		case $1 in
+		"BatteryLevel")
+			pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)";;
+		"BatteryStatus")
+			if [ "$pw_ACStatus" -eq 1 ]; then
+				pw_BatteryStatus=3
+			elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+				pw_BatteryStatus=0
+			elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+				pw_BatteryStatus=2
+			elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+				pw_BatteryStatus=1
+			fi;;
+		"ACStatus")
+			pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)";;
+		*)
+			pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)"
+    		pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)"
+
+			if [ "$pw_ACStatus" -eq 1 ]; then
+				pw_BatteryStatus=3
+			elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+				pw_BatteryStatus=0
+			elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ]; then
+				pw_BatteryStatus=2
+			elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
+				pw_BatteryStatus=1
+			fi;;
+		esac;;
+
 	*)
-		pw_BatteryLevel="$(cat /tmp/pw_BatteryLevelDebug)"
-    	pw_ACStatus="$(cat /tmp/pw_ACStatusDebug)"
-
-		if [ "$pw_ACStatus" -eq 1 ]; then
-			pw_BatteryStatus=3
-		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=0
-		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ]; then
-			pw_BatteryStatus=2
-		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=1
-		fi;;
-	esac;;
-
-*)
 	case $1 in
 	"BatteryLevel")
 		pw_BatteryLevel="$(apm -l)";;
@@ -84,7 +91,7 @@ case $pw_DebugMode in
 		fi
 
 	esac
-esac
+	esac
 }
 
 pw_ChangeIcon() {
@@ -95,19 +102,11 @@ pw_ChangeIcon() {
 	fi
 
 	if [ "$pw_ACStatus" -eq 1 ] && [ "$pw_BatteryStatus" -eq 3 ] && [ "$pw_BatteryLevel" -eq 100 ]; then
-    local pw_PercentageNumberIcon="100-charged"
+    	local pw_PercentageNumberIcon="100-charged"
 	else
 		local pw_BatteryLevel2=$(($pw_BatteryLevel / 10 * 10))
 		local pw_PercentageNumberIcon="$pw_BatteryLevel2$pw_Suffix"
 	fi
-
-
-#	if [ "$pw_BatteryStatus" -eq 3 ] && [ "$pw_BatteryLevel" -eq 100 ]; then
-#		local pw_PercentageNumberIcon="100-charged"
-#	else
-#		local pw_BatteryLevel2=$(($pw_BatteryLevel / 10 * 10))
-#		local pw_PercentageNumberIcon="$pw_BatteryLevel2$pw_Suffix"
-#	fi
 
 	pw_NotifIcon="$pw_IconDir$pw_ExtraDir/battery-level-$pw_PercentageNumberIcon-symbolic.svg"
 }
@@ -123,18 +122,68 @@ pw_SummonNotif() {
 	if [ -z "$pw_NotifTitle" ] && [ -z "$pw_NotifSubtitle" ]; then
 		echo "Missing arguments"
 	else
-		notify-send -r 27072 "$pw_NotifTitle" "$pw_NotifSubtitle" -i "$pw_NotifIcon" -u "$pw_NotifUrgency" &
+		notify-send -r 27078 "$pw_NotifTitle" "$pw_NotifSubtitle" -i "$pw_NotifIcon" -u "$pw_NotifUrgency" &
 	fi
 
 }
 
+pw_ForbiddenPrograms="echo rm touch cp mv mkdir printf"
+
+pw_OneWordCheck() {
+	
+	if [ -z "$pw_CustomMusicProgram" ]; then
+		echo "[Error] pw_CustomMusicProgram is empty."
+		exit 1
+	fi
+	
+	local pw_Counter=0
+	
+	for pw_CommandIteration1 in $pw_CustomMusicProgram; do
+		if [ $pw_Counter != 0 ]; then
+			echo "[Error] Command is longer than one word."
+			exit 1
+		fi
+		local pw_Counter=$(($pw_Counter + 1))
+	done
+}
+
+pw_OneWordCheck
+
+for pw_CommandIteration2 in $pw_ForbiddenPrograms; do
+	if [ "$pw_CustomMusicProgram" = "$pw_CommandIteration2" ]; then
+		echo "[Error] ""'"$pw_CommandIteration2"'"" is not allowed."
+		exit 1
+	fi
+done
+
+for pw_Word in $pw_ForbiddenPrograms; do
+    echo "$pw_ArgumentsAfterFile" | grep -q "$pw_Word"
+    if [ $? -eq 0 ]; then
+        echo "[Error] ""'"$pw_ArgumentsAfterFile"'"" is not allowed."
+		exit 1
+    fi
+done
+
+for pw_Word in $pw_ForbiddenPrograms; do
+    echo "$pw_ArgumentsBeforeFile" | grep -q "$pw_Word"
+    if [ $? -eq 0 ]; then
+        echo "[Error] ""'"$ArgumentsBeforeFile"'"" is not allowed."
+		exit 1
+    fi
+done
+
+
+
+
 pw_Sound() {
-	case $pw_SoundSystem in
-		"oss")
-			cat Charging.raw > /dev/dsp &;;
-		"pulse")
-			paplay "/home/fen/My working dirs/BatteryScript/Charging.wav" >> /dev/null &;;
-	esac
+	#case $pw_SoundSystem in
+	#	"oss")
+	#		cat "$pw_SoundLocation" > /dev/dsp &;;
+	#	"pulse")
+	#		echo "$(paplay "$pw_SoundLocation")" >> /dev/null &;;
+	#	"custom")
+			eval "$pw_CustomMusicProgram" "$pw_ArgumentsBeforeFile" "'""$pw_SoundLocation""'" "$pw_ArgumentsAfterFile" &
+	#esac
 }
 
 pw_DischargeNotif() {
@@ -199,23 +248,9 @@ pw_DischargeNotif() {
 
 pw_QuitDaemon() {
 	rm /tmp/pw_BatteryDaemon
-
-#	if [ "$pw_DebugMode" = "True" ]; then
-#		rm /tmp/pw_BatteryLevelDebug
-#		rm /tmp/pw_BatteryStatusDebug
-#		rm /tmp/pw_ACStatusDebug
-#	fi
-
 	exit 0
 }
 
-#if [ $pw_BatteryStatus -eq 3 ]; then
-#	pw_Subtitle="Charging"
-#else
-#	pw_Subtitle="Discharging"
-#fi
-
-#pw_SummonNotif "Battery Left: $pw_BatteryLevel%" "$pw_Subtitle" "low"
 pw_CheckStatus
 
 pw_CurrentBatteryStatus="$pw_BatteryStatus"
@@ -235,13 +270,14 @@ fi
 pw_MainModule() {
 
 	pw_CheckStatus
-  if [ "$pw_DebugMode" != "True" ]; then
-  if [ "$CLIBehaviorLockin" = "True" ] || [ -z "$DISPLAY" ]; then
-    echo "CLI" > /tmp/pw_BatteryDaemon
-  elif [ "$CLIBehaviorLockin" = "False" ] && [ -n "$DISPLAY" ]; then
-    echo "X11" > /tmp/pw_BatteryDaemon
-  fi
-  fi
+
+	if [ "$pw_DebugMode" != "True" ]; then
+		if [ "$CLIBehaviorLockin" = "True" ] || [ -z "$DISPLAY" ]; then
+    		echo "CLI" > /tmp/pw_BatteryDaemon
+		elif [ "$CLIBehaviorLockin" = "False" ] && [ -n "$DISPLAY" ]; then
+    		echo "X11" > /tmp/pw_BatteryDaemon
+  		fi
+	fi
 
 	if [ "$pw_ACStatus" -eq 0 ] && [ "$pw_Charging" = "True" ]; then
 		pw_ChangeIcon
@@ -280,7 +316,7 @@ case $1 in
     exit 0;;
 	"daemon")
 		if [ -e /tmp/pw_BatteryDaemon ]; then
-			echo "You already have a battery daemon running."
+			echo "[Error] You already have a battery daemon running."
 			exit 1
 		fi
 	
