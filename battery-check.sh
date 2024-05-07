@@ -4,12 +4,13 @@ pw_IconDir="/usr/local/share/icons/Adwaita"
 pw_ExtraDir="/scalable/status"
 
 # The name of the program, needs to be reachable in $PATH
-pw_CustomMusicProgram="paplay" # Required if using 'custom'
-pw_SoundLocation="/home/fen/My working dirs/BatteryScript/Charging.wav"
+pw_SoundEnabled="True"
+pw_CustomMusicProgram="paplay" # Required if active
+pw_SoundLocation="/home/fen/My working dirs/BatteryScript/Charging.wav" # Required if active
 
 # Your program needs arguments? Parse them below.
-pw_ArgumentsBeforeFile=""
-pw_ArgumentsAfterFile=""
+pw_ArgumentsBeforeFile="" #Optional
+pw_ArgumentsAfterFile="" # Optional
 
 pw_LowBatteryPercentage=20
 pw_CriticalLowBatteryPercentage=10
@@ -127,63 +128,66 @@ pw_SummonNotif() {
 
 }
 
-pw_ForbiddenPrograms="echo rm touch cp mv mkdir printf"
+pw_ForbiddenPrograms="echo rm touch cp mv mkdir printf rmdir"
 
 pw_OneWordCheck() {
 	
-	if [ -z "$pw_CustomMusicProgram" ]; then
-		echo "[Error] pw_CustomMusicProgram is empty."
+	if [ -z "$pw_CustomMusicProgram" ] || [ -z "$pw_SoundLocation" ]; then
+		echo "[Error] One or more required variables are empty."
 		exit 1
+	else
+	
+		local pw_Counter=0
+	
+		for pw_CommandIteration1 in $pw_CustomMusicProgram; do
+			if [ $pw_Counter != 0 ]; then
+				echo "[Error] Command is longer than one word."
+				exit 1
+			fi
+			local pw_Counter=$(($pw_Counter + 1))
+		done
+
+		for pw_CommandIteration2 in $pw_ForbiddenPrograms; do
+			if [ "$pw_CustomMusicProgram" = "$pw_CommandIteration2" ]; then
+				echo "[Error] ""'"$pw_CommandIteration2"'"" is not allowed."
+				exit 1
+			fi
+		done
 	fi
-	
-	local pw_Counter=0
-	
-	for pw_CommandIteration1 in $pw_CustomMusicProgram; do
-		if [ $pw_Counter != 0 ]; then
-			echo "[Error] Command is longer than one word."
+
+	for pw_Word in $pw_ForbiddenPrograms; do
+    	echo "$pw_ArgumentsAfterFile" | grep -q "$pw_Word"
+    
+		if [ $? -eq 0 ]; then
+        	echo "[Error] ""'"$pw_ArgumentsAfterFile"'"" is not allowed."
 			exit 1
-		fi
-		local pw_Counter=$(($pw_Counter + 1))
+    	fi
 	done
+
+	for pw_Word in $pw_ForbiddenPrograms; do
+    	echo "$pw_ArgumentsBeforeFile" | grep -q "$pw_Word"
+    	
+		if [ $? -eq 0 ]; then
+        	echo "[Error] ""'"$ArgumentsBeforeFile"'"" is not allowed."
+			exit 1
+    	fi
+	done
+
 }
 
-pw_OneWordCheck
-
-for pw_CommandIteration2 in $pw_ForbiddenPrograms; do
-	if [ "$pw_CustomMusicProgram" = "$pw_CommandIteration2" ]; then
-		echo "[Error] ""'"$pw_CommandIteration2"'"" is not allowed."
-		exit 1
-	fi
-done
-
-for pw_Word in $pw_ForbiddenPrograms; do
-    echo "$pw_ArgumentsAfterFile" | grep -q "$pw_Word"
-    if [ $? -eq 0 ]; then
-        echo "[Error] ""'"$pw_ArgumentsAfterFile"'"" is not allowed."
-		exit 1
-    fi
-done
-
-for pw_Word in $pw_ForbiddenPrograms; do
-    echo "$pw_ArgumentsBeforeFile" | grep -q "$pw_Word"
-    if [ $? -eq 0 ]; then
-        echo "[Error] ""'"$ArgumentsBeforeFile"'"" is not allowed."
-		exit 1
-    fi
-done
-
-
-
+if [ $pw_SoundEnabled = "True" ]; then
+	pw_OneWordCheck
+else
+	unset pw_CustomMusicProgram
+	unset pw_SoundLocation
+	unset pw_ArgumentsBeforeFile
+	unset pw_ArgumentsAfterFile
+fi
 
 pw_Sound() {
-	#case $pw_SoundSystem in
-	#	"oss")
-	#		cat "$pw_SoundLocation" > /dev/dsp &;;
-	#	"pulse")
-	#		echo "$(paplay "$pw_SoundLocation")" >> /dev/null &;;
-	#	"custom")
-			eval "$pw_CustomMusicProgram" "$pw_ArgumentsBeforeFile" "'""$pw_SoundLocation""'" "$pw_ArgumentsAfterFile" &
-	#esac
+	if [ "$pw_SoundEnabled" = "True" ]; then
+		eval "$pw_CustomMusicProgram" "$pw_ArgumentsBeforeFile" "'""$pw_SoundLocation""'" "$pw_ArgumentsAfterFile" &
+	fi
 }
 
 pw_DischargeNotif() {
@@ -286,7 +290,9 @@ pw_MainModule() {
 		fi
 	elif [ "$pw_ACStatus" -eq 1 ] && [ "$pw_Charging" = "False" ]; then
 		pw_ChangeIcon
-		pw_Sound
+		if [ $pw_SoundEnabled = "True" ]; then
+			pw_Sound
+		fi
     	pw_DischargeNotif
     	pw_Charging="True"
 	fi
