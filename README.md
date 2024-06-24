@@ -1,5 +1,5 @@
 # Battery-Check Shell Script
-This is a simple battery indicator built in sh. This was made for FreeBSD but should work on every other POSIX-compliant shell.
+This is a simple battery indicator built in sh. This was made for FreeBSD but should work on Linux aswell.
 
 Dependencies
 ------------

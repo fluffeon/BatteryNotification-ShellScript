@@ -6,7 +6,7 @@ pw_ExtraDir="/scalable/status"
 # The name of the program, needs to be reachable in $PATH
 pw_SoundEnabled="True"
 pw_CustomMusicProgram="paplay" # Required if active
-pw_SoundLocation="/home/fen/My working dirs/BatteryScript/Charging.wav" # Required if active
+pw_SoundLocation="Charging.wav" # Required if active
 
 # Your program needs arguments? Parse them below.
 pw_ArgumentsBeforeFile="" #Optional
@@ -52,7 +52,11 @@ pw_CheckStatus() {
 	*)
 	case $1 in
 	"BatteryLevel")
-		pw_BatteryLevel="$(apm -l)";;
+    if [ "$(uname)" = "FreeBSD" ]; then
+		  pw_BatteryLevel="$(apm -l)"
+    elif [ "$(uname)" = "Linux" ]; then
+      pw_BatteryLevel="$(cat /sys/class/power_supply/BAT1/capacity)"
+    fi;;
   
 	"BatteryStatus")
 		# Battery Status
@@ -75,21 +79,20 @@ pw_CheckStatus() {
 		# 0 - Off-Line
 		# 1 - On-Line
 		# 2 - Backup Power
-		pw_ACStatus="$(apm -a)";;
+    if [ "$(uname)" = "FreeBSD" ]; then
+		  pw_ACStatus="$(apm -a)"
+    elif [ "$(uname)" = "Linux" ]; then
+      if [ "$(cat /sys/class/power_supply/BAT1/status)" = "Charging" ]; then
+        pw_ACStatus=1
+      else
+        pw_ACStatus=0
+      fi
+    fi;;
 
 	*)
-		pw_BatteryLevel="$(apm -l)"
-    	pw_ACStatus="$(apm -a)"
-
-		if [ "$pw_ACStatus" -eq 1 ]; then
-			pw_BatteryStatus=3
-		elif [ "$pw_BatteryLevel" -gt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=0
-		elif [ "$pw_BatteryLevel" -lt "$pw_CriticalLowBatteryPercentage" ]; then
-			pw_BatteryStatus=2
-		elif [ "$pw_BatteryLevel" -lt "$pw_LowBatteryPercentage" ] && [ "$pw_ACStatus" != 1 ]; then
-			pw_BatteryStatus=1
-		fi
+    pw_CheckStatus ACStatus
+    pw_CheckStatus BatteryLevel
+    pw_CheckStatus BatteryStatus	
 
 	esac
 	esac
